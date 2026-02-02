@@ -28,7 +28,7 @@ This pre-commit hook automatically:
 ### Remote (one-liner)
 
 ```powershell
-irm https://gist.githubusercontent.com/YOUR_USER/GIST_ID/raw/install.ps1 | iex
+irm https://raw.githubusercontent.com/David-c0degeek/ZWNBSP-Guard/main/install.ps1 | iex
 ```
 
 ### Local
