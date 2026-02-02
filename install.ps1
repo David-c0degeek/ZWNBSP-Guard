@@ -1,24 +1,21 @@
 # ZWNBSP Guard - Global Git Hook Installer
-# Run: .\Install-ZwnbspHook.ps1
+# Local:  .\install.ps1
+# Remote: irm https://gist.githubusercontent.com/USER/ID/raw/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
-
 $globalHooks = "$env:USERPROFILE\.git-hooks"
 
-# Create directory
 if (-not (Test-Path $globalHooks)) {
     New-Item -ItemType Directory -Path $globalHooks -Force | Out-Null
 }
 
 # Bash shim (Git uses bash by default)
-$shimPath = Join-Path $globalHooks "pre-commit"
 $shimContent = @'
 #!/bin/sh
 exec powershell.exe -ExecutionPolicy Bypass -NoProfile -File "$(dirname "$0")/pre-commit.ps1"
 '@
 
 # PowerShell hook
-$ps1Path = Join-Path $globalHooks "pre-commit.ps1"
 $ps1Content = @'
 $ErrorActionPreference = "Stop"
 $files = git diff --cached --name-only --diff-filter=ACMR
@@ -72,8 +69,8 @@ exit 0
 '@
 
 # Write files
-[System.IO.File]::WriteAllText($shimPath, $shimContent.Replace("`r`n", "`n"))
-Set-Content -Path $ps1Path -Value $ps1Content -Encoding UTF8
+[System.IO.File]::WriteAllText("$globalHooks\pre-commit", $shimContent.Replace("`r`n", "`n"))
+Set-Content -Path "$globalHooks\pre-commit.ps1" -Value $ps1Content -Encoding UTF8
 
 # Configure git globally
 git config --global core.hooksPath $globalHooks
