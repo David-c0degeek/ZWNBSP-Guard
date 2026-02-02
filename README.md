@@ -20,8 +20,8 @@ This pre-commit hook automatically:
 
 | Issue | Action |
 |-------|--------|
-| UTF-8 BOM at file start | ✅ Auto-removes and re-stages |
-| U+FEFF inside file content | ⛔ Blocks commit with location info |
+| UTF-8 BOM at file start | Auto-removes and re-stages |
+| U+FEFF inside file content | Blocks commit with location info |
 
 ## Installation
 
@@ -82,7 +82,7 @@ Remove-Item -Recurse "$env:USERPROFILE\.git-hooks"
           ▼                       ▼
 ┌─────────────────┐     ┌─────────────────┐
 │   No issues     │     │  U+FEFF found   │
-│   ✅ Commit     │     │  ⛔ Blocked     │
+│   [COMMIT]      │     │  [BLOCKED]      │
 └─────────────────┘     └─────────────────┘
 ```
 
@@ -90,18 +90,17 @@ Remove-Item -Recurse "$env:USERPROFILE\.git-hooks"
 
 ### Clean commit
 ```
-✅ Removed UTF-8 BOM: src/Program.cs
-✅ BOM cleanup complete. Files re-staged.
+[OK] Removed UTF-8 BOM: src/Program.cs
+[OK] BOM cleanup complete.
 [main abc1234] Your commit message
 ```
 
 ### Blocked commit
 ```
-❌ U+FEFF (ZWNBSP) in: src/Service.cs at positions: 0, 847, 1203
+[ERROR] U+FEFF (ZWNBSP) in: src/Service.cs at positions: 0, 847, 1203
 
-⛔ Commit blocked. Files contain literal U+FEFF characters.
-   Tip: Open in hex editor or run:
-   $content = Get-Content -Raw 'file'; $content -replace [char]0xFEFF,'' | Set-Content 'file' -NoNewline
+[BLOCKED] Commit blocked. Files contain U+FEFF characters.
+Fix: $c = Get-Content -Raw 'file'; $c -replace [char]0xFEFF,'' | Set-Content 'file' -NoNewline
 ```
 
 ## Manual Cleanup
