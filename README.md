@@ -1,17 +1,22 @@
 # ZWNBSP Guard 🛡️
 
-A global Git pre-commit hook that protects your codebase from invisible Unicode characters inserted by AI coding assistants.
+A Git pre-commit hook that protects your codebase from invisible Unicode characters that can break builds, cause subtle bugs, and drive you crazy.
 
 ## The Problem
 
-AI coding tools (Copilot, Claude Code, Cursor, etc.) occasionally insert invisible **U+FEFF** (Zero-Width No-Break Space) characters into your code. These characters:
+AI coding assistants (Copilot, Claude Code, Cursor, etc.) occasionally insert invisible **U+FEFF** (Zero-Width No-Break Space) characters into your code. These characters:
 
 - Are completely invisible in most editors
-- Break compilers, interpreters, and parsers
+- Can break compilers, interpreters, and parsers
 - Cause "it works on my machine" syndrome
 - Are extremely difficult to diagnose
+- Often appear at the start of lines or inside string literals
+
+The UTF-8 BOM (`EF BB BF`) at file starts is a related issue that can cause similar problems.
 
 ## The Solution
+
+This pre-commit hook automatically:
 
 | Issue | Action |
 |-------|--------|
@@ -20,13 +25,19 @@ AI coding tools (Copilot, Claude Code, Cursor, etc.) occasionally insert invisib
 
 ## Installation
 
-**One command, works for ALL your git repos:**
+### Remote install (one-liner)
 
 ```powershell
-.\Install-ZwnbspHook.ps1
+irm https://gist.githubusercontent.com/YOUR_USER/GIST_ID/raw/install.ps1 | iex
 ```
 
-That's it. Every git commit on your machine is now protected.
+### Local install
+
+```powershell
+.\install.ps1
+```
+
+Both methods install the hook **globally** — every git repo on your machine is protected.
 
 ## Uninstall
 
@@ -35,49 +46,128 @@ git config --global --unset core.hooksPath
 Remove-Item -Recurse "$env:USERPROFILE\.git-hooks"
 ```
 
+## Requirements
+
+- Windows with PowerShell 5.1+
+- Git for Windows
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    git commit                           │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────┐
+│              pre-commit hook triggers                   │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────┐
+│         Get list of staged files (ACMR)                 │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────┐
+│              For each text file:                        │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ 1. Check for UTF-8 BOM → Auto-fix & re-stage      │ │
+│  │ 2. Scan for U+FEFF → Report positions             │ │
+│  └────────────────────────────────────────────────────┘ │
+└─────────────────────┬───────────────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+          ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐
+│   No issues     │     │  U+FEFF found   │
+│   ✅ Commit     │     │  ⛔ Blocked     │
+└─────────────────┘     └─────────────────┘
+```
+
 ## Example Output
+
+### Clean commit
+```
+✅ Removed UTF-8 BOM: src/Program.cs
+✅ BOM cleanup complete. Files re-staged.
+[main abc1234] Your commit message
+```
 
 ### Blocked commit
 ```
-❌ U+FEFF (ZWNBSP) in: src/Service.cs at positions: 0, 847
+❌ U+FEFF (ZWNBSP) in: src/Service.cs at positions: 0, 847, 1203
 
-⛔ Commit blocked. Files contain U+FEFF characters.
-   Fix: $c = Get-Content -Raw 'file'; $c -replace [char]0xFEFF,'' | Set-Content 'file' -NoNewline
-```
-
-### Auto-fixed BOM
-```
-✅ Removed UTF-8 BOM: src/Program.cs
-✅ BOM cleanup complete.
+⛔ Commit blocked. Files contain literal U+FEFF characters.
+   Tip: Open in hex editor or run:
+   $content = Get-Content -Raw 'file'; $content -replace [char]0xFEFF,'' | Set-Content 'file' -NoNewline
 ```
 
 ## Manual Cleanup
 
-```powershell
-# Fix a single file
-$c = Get-Content -Raw "path/to/file.cs"
-$c -replace [char]0xFEFF, '' | Set-Content "path/to/file.cs" -NoNewline
+If the hook blocks your commit, you can fix the file manually:
 
-# Find all ZWNBSP in current directory
+### PowerShell
+```powershell
+$file = "path/to/file.cs"
+$content = Get-Content -Raw $file
+$content -replace [char]0xFEFF, '' | Set-Content $file -NoNewline
+```
+
+### Find all ZWNBSP in a directory
+```powershell
 Get-ChildItem -Recurse -File | ForEach-Object {
-    $text = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($_.FullName))
-    if ($text.Contains([char]0xFEFF)) { Write-Host $_.FullName }
+    $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    if ($text.Contains([char]0xFEFF)) {
+        Write-Host "Found in: $($_.FullName)"
+    }
 }
 ```
 
 ## Skipped Files
 
-Binary extensions are ignored: `.exe .dll .png .jpg .jpeg .gif .ico .woff .woff2 .ttf .eot .pdf .zip .7z .rar .bin .obj .pdb`
+The hook automatically skips binary files with these extensions:
 
-## Disable for a Single Repo
+```
+.exe .dll .png .jpg .jpeg .gif .ico .woff .woff2 .ttf .eot .pdf .zip .7z .rar .bin .obj .pdb
+```
 
-If a specific repo needs different hooks:
+## FAQ
+
+### Why not just auto-fix ZWNBSP too?
+
+Unlike the BOM (which is always at position 0), ZWNBSP characters inside files might occasionally be intentional (e.g., in test data or documentation about Unicode). The hook reports exact positions so you can make an informed decision.
+
+### Does this work with WSL?
+
+The hook is designed for Git for Windows with PowerShell. For WSL, you'd want a bash-native version.
+
+### How do I disable this for a single repo?
 
 ```powershell
 cd your-repo
 git config --local core.hooksPath .git/hooks
 ```
 
+### What about other invisible characters?
+
+This hook focuses on U+FEFF specifically because it's the most common culprit from AI tools. You could extend the `$text.Contains()` check to include other problematic characters like:
+
+- U+200B (Zero-Width Space)
+- U+200C (Zero-Width Non-Joiner)  
+- U+200D (Zero-Width Joiner)
+- U+2060 (Word Joiner)
+
+## Contributing
+
+Issues and PRs welcome! If you encounter other invisible character problems from AI coding tools, please open an issue.
+
+## License
+
+MIT License - Use freely, attribution appreciated.
+
 ---
 
-*Built out of frustration with invisible characters breaking builds.* 🌙
+*Built out of frustration with invisible characters breaking builds at 2 AM.* 🌙
