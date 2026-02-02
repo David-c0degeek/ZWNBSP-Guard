@@ -25,19 +25,19 @@ This pre-commit hook automatically:
 
 ## Installation
 
-### Remote install (one-liner)
+### Remote (one-liner)
 
 ```powershell
 irm https://gist.githubusercontent.com/YOUR_USER/GIST_ID/raw/install.ps1 | iex
 ```
 
-### Local install
+### Local
 
 ```powershell
 .\install.ps1
 ```
 
-Both methods install the hook **globally** — every git repo on your machine is protected.
+Same script, both methods. Installs **globally** — every git repo on your machine is protected.
 
 ## Uninstall
 
