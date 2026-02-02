@@ -1,6 +1,6 @@
 # ZWNBSP Guard - Global Git Hook Installer
 # Local:  .\install.ps1
-# Remote: irm https://gist.githubusercontent.com/USER/ID/raw/install.ps1 | iex
+# Remote: irm https://raw.githubusercontent.com/David-c0degeek/ZWNBSP-Guard/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 $globalHooks = "$env:USERPROFILE\.git-hooks"
@@ -15,7 +15,7 @@ $shimContent = @'
 exec powershell.exe -ExecutionPolicy Bypass -NoProfile -File "$(dirname "$0")/pre-commit.ps1"
 '@
 
-# PowerShell hook
+# PowerShell hook - using ASCII-safe characters to avoid encoding issues
 $ps1Content = @'
 $ErrorActionPreference = "Stop"
 $files = git diff --cached --name-only --diff-filter=ACMR
@@ -37,7 +37,7 @@ foreach ($f in $files) {
         $bytes = $bytes[3..($bytes.Length-1)]
         [System.IO.File]::WriteAllBytes($f, $bytes)
         git add $f 2>$null
-        Write-Host "✅ Removed UTF-8 BOM: $f" -ForegroundColor Green
+        Write-Host "[OK] Removed UTF-8 BOM: $f" -ForegroundColor Green
         $fixedAny = $true
     }
     
@@ -48,21 +48,21 @@ foreach ($f in $files) {
         for ($i = 0; $i -lt $text.Length; $i++) {
             if ($text[$i] -eq [char]0xFEFF) { $positions += $i }
         }
-        Write-Host "❌ U+FEFF (ZWNBSP) in: $f at positions: $($positions -join ', ')" -ForegroundColor Red
+        Write-Host "[ERROR] U+FEFF (ZWNBSP) in: $f at positions: $($positions -join ', ')" -ForegroundColor Red
         $badAny = $true
     }
 }
 
 if ($badAny) {
     Write-Host ""
-    Write-Host "⛔ Commit blocked. Files contain U+FEFF characters." -ForegroundColor Red
-    Write-Host "   Fix: " -ForegroundColor Yellow -NoNewline
+    Write-Host "[BLOCKED] Commit blocked. Files contain U+FEFF characters." -ForegroundColor Red
+    Write-Host "Fix: " -ForegroundColor Yellow -NoNewline
     Write-Host "`$c = Get-Content -Raw 'file'; `$c -replace [char]0xFEFF,'' | Set-Content 'file' -NoNewline" -ForegroundColor DarkGray
     exit 1
 }
 
 if ($fixedAny) {
-    Write-Host "✅ BOM cleanup complete." -ForegroundColor Green
+    Write-Host "[OK] BOM cleanup complete." -ForegroundColor Green
 }
 
 exit 0
@@ -70,13 +70,13 @@ exit 0
 
 # Write files
 [System.IO.File]::WriteAllText("$globalHooks\pre-commit", $shimContent.Replace("`r`n", "`n"))
-Set-Content -Path "$globalHooks\pre-commit.ps1" -Value $ps1Content -Encoding UTF8
+[System.IO.File]::WriteAllText("$globalHooks\pre-commit.ps1", $ps1Content)
 
 # Configure git globally
 git config --global core.hooksPath $globalHooks
 
 Write-Host ""
-Write-Host "✅ ZWNBSP Guard installed globally!" -ForegroundColor Green
+Write-Host "[OK] ZWNBSP Guard installed globally!" -ForegroundColor Green
 Write-Host ""
 Write-Host "   Hooks directory: $globalHooks" -ForegroundColor DarkGray
 Write-Host "   Applies to:      ALL git repositories" -ForegroundColor DarkGray
